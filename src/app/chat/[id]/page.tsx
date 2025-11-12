@@ -27,7 +27,10 @@ export default function Chat() {
             <div className="flex-1">
                 <ChatThread chatId={chatId} />
             </div>
-            <BottomNav />
+            {/* Hide BottomNav on chat pages for full-screen chat experience */}
+            <div className="hidden">
+                <BottomNav />
+            </div>
         </div>
     )
 }

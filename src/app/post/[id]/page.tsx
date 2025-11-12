@@ -89,16 +89,32 @@ export default function PostDetail() {
     }
 
     const handleMessageSeller = async () => {
-        if (!post) return
+        // Don't allow clicking if user state is still loading
+        if (userLoading) {
+            toast.error('Please wait while we check your login status...')
+            return
+        }
+
+        if (!post) {
+            toast.error('Post not loaded yet. Please wait.')
+            return
+        }
 
         // If user is not logged in, redirect to auth
         if (!user) {
+            toast.error('Please log in to send messages')
             router.push('/auth')
             return
         }
 
+        // Check if post has user data
+        if (!post.users?.username) {
+            toast.error('Post author information not available')
+            return
+        }
+
         // Don't allow messaging yourself
-        if (post.users?.username === user.username) {
+        if (post.users.username === user.username) {
             toast.error('You cannot message yourself')
             return
         }
@@ -107,7 +123,7 @@ export default function PostDetail() {
             // Get or create chat
             const chat = await getOrCreateChat({
                 user1: user.username,
-                user2: post.users?.username || '',
+                user2: post.users.username,
                 postId: post.id,
             })
 
@@ -245,10 +261,11 @@ export default function PostDetail() {
                                     e.preventDefault()
                                     handleMessageSeller()
                                 }}
-                                className="w-full bg-red-500 hover:bg-red-600 active:bg-red-700 text-white py-3 rounded-lg font-medium transition-colors touch-manipulation"
+                                disabled={loading || userLoading}
+                                className="w-full bg-red-500 hover:bg-red-600 active:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white py-3 rounded-lg font-medium transition-colors touch-manipulation"
                                 style={{ WebkitTapHighlightColor: 'transparent' }}
                             >
-                                💬 Message
+                                💬 {loading || userLoading ? 'Loading...' : 'Message'}
                             </motion.button>
                         )}
 

@@ -22,17 +22,19 @@ export default function NavDesktop() {
     const [hasUnread, setHasUnread] = useState(false)
     const [isSearchActive, setIsSearchActive] = useState(false)
     const [isDesktop, setIsDesktop] = useState(false)
+    const [isMobile, setIsMobile] = useState(false)
     const [recentSearches, setRecentSearches] = useState<string[]>([])
 
-    // Check if desktop
+    // Check if desktop and mobile
     useEffect(() => {
-        const checkDesktop = () => {
+        const checkScreenSize = () => {
             setIsDesktop(window.innerWidth >= 768)
+            setIsMobile(window.innerWidth < 768)
         }
 
-        checkDesktop()
-        window.addEventListener('resize', checkDesktop)
-        return () => window.removeEventListener('resize', checkDesktop)
+        checkScreenSize()
+        window.addEventListener('resize', checkScreenSize)
+        return () => window.removeEventListener('resize', checkScreenSize)
     }, [])
 
     const navItems = [
@@ -138,10 +140,15 @@ export default function NavDesktop() {
         return null
     }
 
+    // Hide mobile navbar on chat pages and new post page (they have their own headers)
+    const isChatPage = pathname?.startsWith('/chats') || pathname?.startsWith('/chat/')
+    const isNewPostPage = pathname?.startsWith('/post/new')
+    const shouldHideMobileNav = isMobile && (isChatPage || isNewPostPage)
+
     return (
         <>
             {/* Mobile Navbar - Two-level layout */}
-            {pathname !== '/' && (
+            {pathname !== '/' && !shouldHideMobileNav && (
                 <motion.header
                     initial={{ y: 0 }}
                     animate={{

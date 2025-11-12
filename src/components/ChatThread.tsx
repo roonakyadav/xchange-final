@@ -49,55 +49,76 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
-    const [isNearBottom, setIsNearBottom] = useState(true)
-    const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
-    const hasInitialScrollRef = useRef(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
-    // Track if user is near bottom of messages
-    const handleScroll = useCallback(() => {
-        const container = messagesContainerRef.current
-        if (!container) return
-
-        const { scrollTop, scrollHeight, clientHeight } = container
-        const distanceFromBottom = scrollHeight - scrollTop - clientHeight
-        const isNearBottomNow = distanceFromBottom < 100 // Within 100px of bottom
-
-        setIsNearBottom(isNearBottomNow)
-
-        // If user scrolls up, disable auto-scroll until they scroll back down
-        if (!isNearBottomNow && shouldAutoScroll) {
-            setShouldAutoScroll(false)
-        } else if (isNearBottomNow && !shouldAutoScroll) {
-            setShouldAutoScroll(true)
-        }
-    }, [shouldAutoScroll])
-
-    // Auto-scroll only when user sends a message (not on incoming messages)
-    const scrollToBottom = () => {
+    // Simple scroll to bottom function
+    const scrollToBottom = useCallback(() => {
         if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
+        }
+    }, [])
+
+    // Auto-scroll to bottom when user sends a message (only if near bottom)
+    // Don't auto-scroll for incoming messages to avoid interrupting reading
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newMessage.trim() || sending || !user) return
+
+        const messageText = newMessage.trim()
+        setNewMessage('')
+        setSending(true)
+
+        try {
+            await sendMessage({
+                chatId,
+                sender: user.username,
+                body: messageText,
+            })
+
+            // Auto-scroll after sending (only if user is near bottom)
+            const container = messagesContainerRef.current
+            if (container) {
+                const { scrollTop, scrollHeight, clientHeight } = container
+                const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+
+                // Only auto-scroll if user is within 300px of bottom
+                if (distanceFromBottom < 300) {
+                    setTimeout(scrollToBottom, 100)
+                }
+            }
+
+            // Stop typing indicator
+            setIsTyping(false)
+            messageChannelsRef.current.forEach(channel => {
+                if (channel.topic?.includes('presence-typing')) {
+                    updateTypingStatus(channel, false, user.username)
+                }
+            })
+
+            // Clear typing timeout
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current)
+            }
+
+        } catch (error) {
+            console.error('Failed to send message:', error)
+            // Re-add message to input if failed
+            setNewMessage(messageText)
+        } finally {
+            setSending(false)
+            // Keep focus on desktop after sending
+            if (!isMobile) {
+                requestAnimationFrame(() => inputRef.current?.focus())
+            }
         }
     }
 
-    // Add scroll event listener
+    // Scroll to bottom on initial load
     useEffect(() => {
-        const container = messagesContainerRef.current;
-        if (container) {
-            container.addEventListener('scroll', handleScroll);
-            return () => container.removeEventListener('scroll', handleScroll);
+        if (messages.length > 0 && !loading) {
+            setTimeout(scrollToBottom, 200)
         }
-    }, [handleScroll]);
-
-    // Auto-scroll to bottom on mobile when chat opens (only on initial load)
-    useEffect(() => {
-        if (isMobile && messages.length > 0 && window.innerWidth <= 768 && !hasInitialScrollRef.current) {
-            // Small delay to ensure DOM is updated
-            setTimeout(() => {
-                scrollToBottom();
-                hasInitialScrollRef.current = true;
-            }, 100);
-        }
-    }, [messages, isMobile]);
+    }, [messages.length, loading, scrollToBottom])
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const messageChannelsRef = useRef<RealtimeChannel[]>([])
 
@@ -229,49 +250,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
         }, 1500)
     }, [isTyping, user])
 
-    const handleSendMessage = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!newMessage.trim() || sending || !user) return
 
-        const messageText = newMessage.trim()
-        setNewMessage('')
-        setSending(true)
-
-        try {
-            await sendMessage({
-                chatId,
-                sender: user.username,
-                body: messageText,
-            })
-
-            // Scroll to bottom after sending
-            setTimeout(scrollToBottom, 100)
-
-            // Stop typing indicator
-            setIsTyping(false)
-            messageChannelsRef.current.forEach(channel => {
-                if (channel.topic?.includes('presence-typing')) {
-                    updateTypingStatus(channel, false, user.username)
-                }
-            })
-
-            // Clear typing timeout
-            if (typingTimeoutRef.current) {
-                clearTimeout(typingTimeoutRef.current)
-            }
-
-        } catch (error) {
-            console.error('Failed to send message:', error)
-            // Re-add message to input if failed
-            setNewMessage(messageText)
-        } finally {
-            setSending(false)
-            // Keep focus on desktop after sending
-            if (!isMobile) {
-                requestAnimationFrame(() => inputRef.current?.focus())
-            }
-        }
-    }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -372,32 +351,32 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
     const otherUser = chat.user1 === user.username ? chat.user2 : chat.user1
 
     return (
-        <div className="flex flex-col h-full bg-black">
+        <div className="flex flex-col h-screen bg-black overflow-hidden">
             {/* Header */}
-            <div className="sticky top-0 z-10 bg-black border-b border-gray-800 p-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
+            <div className="flex-shrink-0 sticky top-0 z-10 bg-black border-b border-gray-800 p-3 md:p-4">
+                <div className="flex items-center justify-between min-w-0">
+                    <div className="flex items-center space-x-3 md:space-x-4 flex-1 min-w-0">
                         {/* Avatar */}
-                        <div className="relative">
-                            <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-lg">
-                                <span className="text-white font-bold text-lg">
+                        <div className="relative flex-shrink-0">
+                            <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-lg">
+                                <span className="text-white font-bold text-base md:text-lg">
                                     {otherUser.charAt(0).toUpperCase()}
                                 </span>
                             </div>
                             {/* Online indicator */}
-                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-black"></div>
+                            <div className="absolute -bottom-1 -right-1 w-3 h-3 md:w-4 md:h-4 bg-green-500 rounded-full border-2 border-black"></div>
                         </div>
 
-                        {/* User Info */}
-                        <div>
-                            <h2 className="font-semibold text-white text-lg">@{otherUser}</h2>
+                        {/* User Info - Ensure name is always visible */}
+                        <div className="min-w-0 flex-1">
+                            <h2 className="font-semibold text-white text-base md:text-lg truncate">@{otherUser}</h2>
                             {otherUserTyping ? (
                                 <div className="flex items-center space-x-1">
                                     <TypingDots />
                                     <span className="text-xs text-gray-400">typing...</span>
                                 </div>
                             ) : messages.length > 0 ? (
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-gray-500 truncate">
                                     Active {formatTimeAgo(messages[messages.length - 1].created_at)}
                                 </span>
                             ) : (
@@ -410,7 +389,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
                     <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        className="p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl text-gray-400 hover:text-white transition-colors"
+                        className="p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl text-gray-400 hover:text-white transition-colors flex-shrink-0 ml-2"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
@@ -419,11 +398,15 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
                 </div>
             </div>
 
-            {/* Scrollable Messages */}
+            {/* Scrollable Messages - Fixed height calculation */}
             <div
                 ref={messagesContainerRef}
                 id="messages-container"
                 className="flex-1 overflow-y-auto px-4 py-3 space-y-3 scroll-smooth"
+                style={{
+                    maxHeight: 'calc(100vh - 140px)', // Account for header + input bar
+                    WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+                }}
             >
                 {/* Messages */}
                 <AnimatePresence>
@@ -454,7 +437,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
                                                 <video
                                                     src={mediaUrl}
                                                     controls
-                                                    className="max-w-full rounded-2xl border border-gray-700/50 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                                    className="max-w-full rounded-2xl border border-gray-600 object-cover cursor-pointer hover:opacity-90 transition-opacity"
                                                     style={{ maxHeight: '300px' }}
                                                     onClick={() => setMediaViewer({ isOpen: true, mediaUrl, isVideo: true })}
                                                 />
@@ -462,7 +445,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
                                                 <img
                                                     src={mediaUrl}
                                                     alt="shared media"
-                                                    className="max-w-full rounded-2xl border border-gray-700/50 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                                    className="max-w-full rounded-2xl border border-gray-600 object-cover cursor-pointer hover:opacity-90 transition-opacity"
                                                     style={{ maxHeight: '300px' }}
                                                     onClick={() => setMediaViewer({ isOpen: true, mediaUrl, isVideo: false })}
                                                 />
@@ -515,11 +498,14 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Bar */}
-            <div className="sticky bottom-0 bg-black border-t border-gray-800 p-3 flex items-center gap-2">
+            {/* Input Bar - Mobile Optimized */}
+            <div className="flex-shrink-0 sticky bottom-0 bg-black border-t border-gray-800 p-2 md:p-3 flex items-end gap-2"
+                style={{
+                    paddingBottom: isMobile ? 'max(8px, env(safe-area-inset-bottom))' : '12px'
+                }}>
                 {/* Upload Progress */}
                 {uploading && (
-                    <div className="mb-4 flex items-center space-x-3 text-gray-400">
+                    <div className="absolute -top-12 left-2 right-2 flex items-center space-x-3 text-gray-400">
                         <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
                             <div
                                 className="h-2 bg-red-500 transition-all duration-300"
@@ -530,43 +516,84 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
                     </div>
                 )}
 
-                <button type="button" className="p-2 rounded-full hover:bg-gray-900 transition">
-                    <Plus className="w-5 h-5 text-gray-400" />
-                    <input
-                        type="file"
-                        accept="image/*,video/*"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        disabled={uploading}
-                    />
-                </button>
-                <input
-                    ref={inputRef}
-                    type="text"
-                    placeholder="Message..."
-                    value={newMessage}
-                    onChange={(e) => {
-                        setNewMessage(e.target.value)
-                        handleTyping()
+                {/* File Upload Button */}
+                <button
+                    type="button"
+                    className="p-2 rounded-full hover:bg-gray-900 transition-colors touch-manipulation flex-shrink-0"
+                    onClick={(e) => {
+                        e.preventDefault()
+                        // Trigger file input using ref
+                        fileInputRef.current?.click()
                     }}
-                    onKeyDown={handleKeyDown}
-                    className="flex-1 bg-gray-900 rounded-full px-4 py-2 text-sm text-white outline-none border border-gray-800 focus:border-red-500"
-                    disabled={sending || uploading}
+                    onTouchStart={(e) => {
+                        e.preventDefault()
+                        // Trigger file input using ref
+                        fileInputRef.current?.click()
+                    }}
+                >
+                    <Plus className="w-5 h-5 text-gray-400" />
+                </button>
+
+                {/* Hidden File Input */}
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    disabled={uploading}
                 />
+
+                {/* Message Input */}
+                <div className="flex-1 relative">
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        placeholder="Message..."
+                        value={newMessage}
+                        onChange={(e) => {
+                            setNewMessage(e.target.value)
+                            handleTyping()
+                        }}
+                        onKeyDown={handleKeyDown}
+
+                        className="w-full bg-gray-900 rounded-full px-4 py-3 md:py-2 text-sm text-white outline-none border border-gray-800 focus:border-red-500 transition-colors touch-manipulation"
+                        disabled={sending || uploading}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
+                        inputMode="text"
+                        style={{
+                            WebkitAppearance: 'none',
+                            WebkitTapHighlightColor: 'transparent'
+                        }}
+                    />
+                </div>
+
+                {/* Send Button */}
                 <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleSendMessage}
+                    onTouchStart={(e) => {
+                        e.preventDefault()
+                        handleSendMessage(e as any)
+                    }}
                     disabled={!newMessage.trim() || sending || uploading}
-                    className={`px-4 py-2 rounded-full text-white font-medium transition-all ${newMessage.trim() && !sending && !uploading
-                        ? 'bg-red-600 hover:bg-red-700'
+                    className={`px-4 py-3 md:py-2 rounded-full text-white font-medium transition-all touch-manipulation flex-shrink-0 ${newMessage.trim() && !sending && !uploading
+                        ? 'bg-red-600 hover:bg-red-700 active:bg-red-700'
                         : 'bg-gray-800 text-gray-600 cursor-not-allowed'
                         }`}
+                    style={{
+                        WebkitTapHighlightColor: 'transparent',
+                        minWidth: '60px'
+                    }}
                 >
                     {sending ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
-                        'Send'
+                        <span className="text-sm">Send</span>
                     )}
                 </motion.button>
             </div>
