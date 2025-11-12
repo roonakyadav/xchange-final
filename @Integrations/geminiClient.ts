@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
 export async function classifyCategory(title: string, description: string, apiKey?: string): Promise<string> {
-    const API_KEY = apiKey || process.env.GEMINI_API_KEY;
+    const API_KEY = apiKey || process.env.GEMINI_TAGGING_API_KEY || process.env.GEMINI_API_KEY;
     const text = `${title} ${description}`.toLowerCase();
 
     console.log("🔍 [GEMINI] Classifying:", { title, description });

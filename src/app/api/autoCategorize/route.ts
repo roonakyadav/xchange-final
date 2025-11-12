@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-async function classifyCategory(title: string, description: string): Promise<string> {
-    const API_KEY = process.env.GEMINI_API_KEY;
+async function classifyCategory(title: string, description: string, imageUrl?: string): Promise<string> {
+    const API_KEY = process.env.GEMINI_TAGGING_API_KEY || process.env.GEMINI_API_KEY;
     const text = `${title} ${description}`.toLowerCase();
 
-    console.log("🔍 [GEMINI] Classifying:", { title, description });
+    console.log("🔍 [GEMINI] Classifying:", { title, description, imageUrl });
     console.log("🔑 [GEMINI] API_KEY exists:", !!API_KEY, "value length:", API_KEY?.length || 0);
 
     // If API key is missing, use keyword-based fallback
@@ -17,34 +17,80 @@ async function classifyCategory(title: string, description: string): Promise<str
     try {
         // Initialize Gemini with the API key
         const genAIInstance = new GoogleGenerativeAI(API_KEY);
-        const model = genAIInstance.getGenerativeModel({ model: "gemini-pro" });
 
-        const prompt = `You are a classification AI for a digital marketplace.
-Based on the title and description below, choose **exactly one** of these categories:
+        // Try different models in order of preference
+        const modelsToTry = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-pro"];
+
+        for (const modelName of modelsToTry) {
+            try {
+                console.log(`📤 [GEMINI] Trying model: ${modelName} for categorization`);
+
+                const model = genAIInstance.getGenerativeModel({ model: modelName });
+
+                // Fetch and prepare image if provided
+                let imagePart = null;
+                if (imageUrl) {
+                    try {
+                        const imageResponse = await fetch(imageUrl);
+                        if (imageResponse.ok) {
+                            const imageBuffer = await imageResponse.arrayBuffer();
+                            const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+                            imagePart = {
+                                inlineData: {
+                                    data: Buffer.from(imageBuffer).toString('base64'),
+                                    mimeType: mimeType
+                                }
+                            };
+                        }
+                    } catch (imageError) {
+                        console.warn("⚠️ [GEMINI] Could not fetch image for categorization, proceeding with text-only:", imageError instanceof Error ? imageError.message : String(imageError));
+                    }
+                }
+
+                const prompt = `You are a classification AI for a digital marketplace. Analyze the provided content (including any images) and choose **exactly one** of these categories:
 ["All", "Subscription", "Templates", "Coupon Code", "Art", "Others"].
+
+Consider the visual content, title, and description to determine the most appropriate category.
 
 Output only the category name — no punctuation or explanations.
 
 Title: "${title}"
 Description: "${description}"`;
 
-        console.log("📤 [GEMINI] Sending request with input:", title, description);
+                let result;
+                if (imagePart) {
+                    // Use multimodal content with image and text
+                    result = await model.generateContent([imagePart, prompt]);
+                } else {
+                    // Text-only content
+                    result = await model.generateContent(prompt);
+                }
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const category = response.text().trim();
+                const response = await result.response;
+                const category = response.text().trim();
 
-        console.log("📊 [GEMINI] API result:", category);
+                console.log("📊 [GEMINI] API result:", category);
 
-        // Validate that the response is one of our expected categories
-        const validCategories = ["All", "Subscription", "Templates", "Coupon Code", "Art", "Others"];
-        if (validCategories.includes(category)) {
-            console.log("✅ [GEMINI] Classified as:", category);
-            return category;
-        } else {
-            console.warn("⚠️ [GEMINI] Unexpected category:", category, "- falling back to Others");
-            return "Others";
+                // Validate that the response is one of our expected categories
+                const validCategories = ["All", "Subscription", "Templates", "Coupon Code", "Art", "Others"];
+                if (validCategories.includes(category)) {
+                    console.log("✅ [GEMINI] Classified as:", category);
+                    return category;
+                } else {
+                    console.warn("⚠️ [GEMINI] Unexpected category:", category, "- trying next model");
+                    continue; // Try next model
+                }
+
+            } catch (modelError) {
+                console.warn(`⚠️ [GEMINI] Model ${modelName} failed for categorization:`, modelError instanceof Error ? modelError.message : String(modelError));
+                continue; // Try next model
+            }
         }
+
+        // If all models failed, fall back to keyword classification
+        console.log("🔄 [GEMINI] All models failed, falling back to keyword-based classification");
+        return keywordBasedClassification(text);
 
     } catch (error) {
         console.error("❌ [GEMINI] Category classification failed:", error);
@@ -98,13 +144,13 @@ function keywordBasedClassification(text: string): string {
 
 export async function POST(request: NextRequest) {
     try {
-        const { title, description } = await request.json()
+        const { title, description, imageUrl } = await request.json()
 
         if (!title || !description) {
             return NextResponse.json({ error: 'Title and description are required' }, { status: 400 })
         }
 
-        const category = await classifyCategory(title, description)
+        const category = await classifyCategory(title, description, imageUrl)
 
         return NextResponse.json({ category })
     } catch (error) {

@@ -192,6 +192,7 @@ export default function NewPost() {
                 body: JSON.stringify({
                     title: watch('title'),
                     imageUrl: imagePreview,
+                    mode: watch('mode'), // 'selling' or 'requesting'
                 }),
             })
 
@@ -269,8 +270,8 @@ export default function NewPost() {
                 ? rawData.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
                 : []
 
-            // Classify category using OpenAI API
-            console.log("🏷️ [POST_CREATION] Starting category classification for:", rawData.title);
+            // Classify category using AI (analyzes image, title, and description)
+            console.log("🏷️ [POST_CREATION] Starting AI category classification for:", rawData.title);
             const response = await fetch('/api/autoCategorize', {
                 method: 'POST',
                 headers: {
@@ -279,6 +280,7 @@ export default function NewPost() {
                 body: JSON.stringify({
                     title: rawData.title,
                     description: rawData.description,
+                    imageUrl: publicUrl, // Include the uploaded image for AI analysis
                 }),
             });
             const data = await response.json();

@@ -240,9 +240,15 @@ export default function PostDetail() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.3 }}
                                 onClick={handleMessageSeller}
-                                className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-medium transition-colors"
+                                onTouchStart={(e) => {
+                                    // Prevent default touch behavior on mobile
+                                    e.preventDefault()
+                                    handleMessageSeller()
+                                }}
+                                className="w-full bg-red-500 hover:bg-red-600 active:bg-red-700 text-white py-3 rounded-lg font-medium transition-colors touch-manipulation"
+                                style={{ WebkitTapHighlightColor: 'transparent' }}
                             >
-                                💬 Message {post.mode === 'selling' ? 'Seller' : 'Requester'}
+                                💬 Message
                             </motion.button>
                         )}
 
