@@ -1,0 +1,184 @@
+@import "tailwindcss";
+
+:root {
+  --background: #000000;
+  --foreground: #ffffff;
+  --accent: #FF3B30;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+  overflow-y: auto !important;
+  /* Restore normal scroll everywhere */
+  overflow-x: hidden;
+  background-color: #000;
+  color: #fff;
+  scroll-behavior: smooth;
+}
+
+/* Prevent mobile keyboard viewport issues */
+input,
+textarea {
+  font-size: 16px;
+  /* prevent iOS zoom */
+}
+
+/* Mobile-specific scroll and input fixes */
+@supports (-webkit-touch-callout: none) {
+
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+    /* Prevent zooming on iOS */
+  }
+
+  html,
+  body {
+    height: 100%;
+    width: 100%;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    background-color: #000;
+    color: #fff;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.25s ease-out;
+}
+
+.chat-bubble {
+  display: inline-block;
+  padding: 8px 12px;
+  border-radius: 16px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+@media (min-width: 640px) {
+  .chat-bubble {
+    font-size: 15px;
+  }
+}
+
+/* Mobile scrollbar hiding */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Glassmorphic utilities */
+.glassmorphic {
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.glassmorphic-strong {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* === Xchange theme scrollbar: red thumb on black track ===
+   Only update scrollbar colors. Do not change layout or overflow rules.
+   Works across Chromium browsers and Firefox. */
+
+:root {
+  /* tweakable tokens */
+  --scroll-track: #050505;
+  /* track background (black) */
+  --scroll-thumb: linear-gradient(180deg, #b91c1c, #7f0f0f);
+  /* red gradient thumb */
+  --scroll-thumb-hover: linear-gradient(180deg, #ff3b3b, #b71b1b);
+  /* hover gradient */
+  --scroll-thumb-shadow: rgba(255, 30, 30, 0.18);
+}
+
+/* Global scrollbar size (width / height) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+/* Track (background) */
+::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+}
+
+/* Thumb (draggable) */
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  /* subtle edge */
+  transition: box-shadow 160ms ease, background 160ms ease;
+  box-shadow: none;
+}
+
+/* Hover state for thumb */
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  box-shadow: 0 0 8px var(--scroll-thumb-shadow);
+}
+
+/* Firefox compatible rules */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #b91c1c #050505;
+  /* thumb color, track color */
+}
+
+/* Optional: slightly lighter track on hover of container (non-invasive) */
+.scrollbar-track-hoverable:hover {
+  scrollbar-color: #ff3b3b #030303;
+}
+
+/* Chat-specific scrollbar tuning (if you use a specific id/class) */
+#messages-container::-webkit-scrollbar-thumb,
+aside::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+}
+
+#messages-container::-webkit-scrollbar-thumb:hover,
+aside::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  box-shadow: 0 0 8px var(--scroll-thumb-shadow);
+}
