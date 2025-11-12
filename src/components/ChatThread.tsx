@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, Loader2 } from 'lucide-react'
 import { getChatById, sendMessage, markThreadRead } from '@/lib/db'
 import { subscribeToTyping, updateTypingStatus } from '@/lib/realtime'
@@ -25,6 +25,7 @@ interface ChatThreadProps {
 
 export default function ChatThread({ chatId }: ChatThreadProps) {
     const router = useRouter()
+    const searchParams = useSearchParams()
     const { user } = useUser()
     const { messages, upsertMessages } = useChatMessages(chatId, user?.username)
     const [chat, setChat] = useState<ChatWithPost | null>(null)
@@ -119,6 +120,15 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
             setTimeout(scrollToBottom, 200)
         }
     }, [messages.length, loading, scrollToBottom])
+
+    // Force scroll to bottom if redirected from message button
+    useEffect(() => {
+        const shouldScroll = searchParams.get('scrollToBottom') === 'true'
+        if (shouldScroll && messages.length > 0 && !loading) {
+            // Use a shorter delay for immediate scroll
+            setTimeout(scrollToBottom, 100)
+        }
+    }, [searchParams, messages.length, loading, scrollToBottom])
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const messageChannelsRef = useRef<RealtimeChannel[]>([])
 

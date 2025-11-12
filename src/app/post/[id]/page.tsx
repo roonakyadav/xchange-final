@@ -127,7 +127,8 @@ export default function PostDetail() {
                 postId: post.id,
             })
 
-            router.push(`/chat/${chat.id}`)
+            // Redirect to chat with scroll parameter to ensure scrolling to bottom
+            router.push(`/chat/${chat.id}?scrollToBottom=true`)
         } catch (error) {
             console.error('Error creating chat:', error)
             toast.error('Failed to start chat')
@@ -256,8 +257,7 @@ export default function PostDetail() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.3 }}
                                 onClick={handleMessageSeller}
-                                onTouchStart={(e) => {
-                                    // Prevent default touch behavior on mobile
+                                onTouchEnd={(e) => {
                                     e.preventDefault()
                                     handleMessageSeller()
                                 }}
